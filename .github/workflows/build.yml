@@ -1,0 +1,72 @@
+name: Build Wolfram Equation Solver APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository (grabs your zip file)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Unzip the folder directly on the runner
+      - name: Unzip Wolfram Equation Solver
+        run: |
+          if [ -f "wolfram-equation-solver/wolfram-equation-solver.zip" ]; then
+            echo "Found zip inside wolfram-equation-solver folder."
+            unzip wolfram-equation-solver/wolfram-equation-solver.zip -d wolfram-equation-solver
+          elif [ -f "wolfram equation solver/wolfram equation solver.zip" ]; then
+            echo "Found zip inside wolfram equation solver folder."
+            unzip "wolfram equation solver/wolfram equation solver.zip" -d "wolfram-equation-solver"
+          elif [ -f "wolfram-equation-solver.zip" ]; then
+            echo "Found zip in root."
+            unzip wolfram-equation-solver.zip -d wolfram-equation-solver
+          elif [ -f "wolfram equation solver.zip" ]; then
+            echo "Found zip in root."
+            unzip "wolfram equation solver.zip" -d "wolfram-equation-solver"
+          else
+            echo "Error: Could not find wolfram-equation-solver.zip"
+            exit 1
+          fi
+
+      # Step 3: Set up Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Step 4: Set up Gradle tools
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Step 5: Generate the missing Gradle wrapper inside the newly unzipped folder
+      - name: Generate missing Gradle Wrapper
+        run: |
+          cd wolfram-equation-solver
+          gradle wrapper
+          chmod +x gradlew
+
+      # Step 6: Forge a temporary debug keystore for signing the APK
+      - name: Generate Debug Keystore
+        run: |
+          cd wolfram-equation-solver
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+
+      # Step 7: Build the debug APK
+      - name: Build with Gradle
+        run: |
+          cd wolfram-equation-solver
+          ./gradlew assembleDebug --stacktrace
+
+      # Step 8: Upload the finished APK so you can download it
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wolfram-equation-solver-apk
+          path: wolfram-equation-solver/app/build/outputs/apk/debug/app-debug.apk
